@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'package:qpp/screens/reminder.dart';
 
-import 'package:qpp/screens/playgames.dart';
-
 import 'package:qpp/screens/Listen_Music.dart';
 
 import 'package:qpp/screens/call_doctor.dart';
@@ -13,6 +11,8 @@ import 'package:qpp/screens/chatbot.dart';
 import 'package:qpp/screens/data/local/db_helper.dart';
 
 import 'package:qpp/screens/LOGINPAGE.dart';
+
+import 'package:qpp/screens/game_page.dart';
 
 
 
@@ -212,7 +212,7 @@ class HomePage extends StatelessWidget {
 
                       MaterialPageRoute(
 
-                        builder: (context) => const GameScreen(),
+                        builder: (context) => const GamePageWidget(),
 
                       ),
 
