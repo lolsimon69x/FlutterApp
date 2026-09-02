@@ -46,7 +46,7 @@ class GamePageWidget extends StatelessWidget {
               icon: const Icon(Icons.videogame_asset),
               label: const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                child: Text('Crossword Game', style: TextStyle(fontSize: 18)),
+                child: Text('Word Search', style: TextStyle(fontSize: 18)),
               ),
               style: ElevatedButton.styleFrom(
                 shape: RoundedRectangleBorder(
@@ -56,7 +56,7 @@ class GamePageWidget extends StatelessWidget {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const CrosswordGamePage()),
+                  MaterialPageRoute(builder: (context) => const WordSearchGamePage()),
                 );
               },
             ),

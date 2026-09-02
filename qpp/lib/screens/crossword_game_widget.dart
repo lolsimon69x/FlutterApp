@@ -1,680 +1,368 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
-Future<void> showCrosswordGame(BuildContext context) {
-  return Navigator.of(context).push(
-    MaterialPageRoute(builder: (_) => const CrosswordGamePage()),
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Puzzle Data
-// ---------------------------------------------------------------------------
-
-enum Direction { across, down }
-
-class CrosswordEntry {
-  final String answer;
-  final String clue;
-  final int row;
-  final int col;
-  final Direction direction;
-
-  const CrosswordEntry({
-    required this.answer,
-    required this.clue,
-    required this.row,
-    required this.col,
-    required this.direction,
-  });
-}
-
-const int _gridRows = 5;
-const int _gridCols = 7;
-
-final List<CrosswordEntry> _puzzleEntries = [
-  const CrosswordEntry(
-    answer: 'FLUTTER',
-    clue: 'Google\'s cross-platform UI toolkit',
-    row: 0,
-    col: 0,
-    direction: Direction.across,
-  ),
-  const CrosswordEntry(
-    answer: 'FLOW',
-    clue: 'A steady, continuous stream',
-    row: 0,
-    col: 0,
-    direction: Direction.down,
-  ),
-  const CrosswordEntry(
-    answer: 'TEST',
-    clue: 'A trial run to check something works',
-    row: 0,
-    col: 3,
-    direction: Direction.down,
-  ),
-  const CrosswordEntry(
-    answer: 'ERROR',
-    clue: 'A mistake, often shown in red',
-    row: 0,
-    col: 5,
-    direction: Direction.down,
-  ),
-];
-
-// ---------------------------------------------------------------------------
-// Internal Grid Model
-// ---------------------------------------------------------------------------
-
-class _Cell {
-  String? correctLetter;
-  int? number;
-  String userInput = '';
-  bool isRevealedByHint = false;
-
-  _Cell({this.correctLetter});
-
-  bool get isBlocked => correctLetter == null;
-}
-
-class _NumberedEntry {
-  final CrosswordEntry entry;
-  final int number;
-  int hintsUsed = 0;
-
-  _NumberedEntry(this.entry, this.number);
-
-  String get label =>
-      '$number. ${entry.direction == Direction.across ? "Across" : "Down"}';
-}
-
-// ---------------------------------------------------------------------------
-// Main Page
-// ---------------------------------------------------------------------------
-
-class CrosswordGamePage extends StatefulWidget {
-  const CrosswordGamePage({super.key});
+class WordSearchGamePage extends StatefulWidget {
+  const WordSearchGamePage({super.key});
 
   @override
-  State<CrosswordGamePage> createState() => _CrosswordGamePageState();
+  State<WordSearchGamePage> createState() => _WordSearchGamePageState();
 }
 
-class _CrosswordGamePageState extends State<CrosswordGamePage> {
-  static const int _totalHintsAllowed = 6;
-
-  late List<List<_Cell>> _grid;
-  late List<_NumberedEntry> _numberedEntries;
-  final Map<String, TextEditingController> _controllers = {};
-  final Map<String, FocusNode> _focusNodes = {};
-
-  int _hintsRemaining = _totalHintsAllowed;
-  bool _solvedPuzzle = false;
+class _WordSearchGamePageState extends State<WordSearchGamePage> {
+  // --- Game Data ---
+  final int _gridCols = 8;
   
-  // Tracking
-  Timer? _timer;
-  int _secondsElapsed = 0;
-  int _mistakesMade = 0;
-  int _totalLetters = 0;
+  // An 8x8 grid filled with letters containing hidden words
+  final List<String> _gridLetters = [
+    'F', 'A', 'Q', 'W', 'E', 'R', 'T', 'Y',
+    'L', 'A', 'P', 'P', 'K', 'L', 'M', 'N',
+    'U', 'B', 'C', 'O', 'D', 'E', 'G', 'H',
+    'T', 'D', 'W', 'I', 'D', 'G', 'E', 'T',
+    'T', 'E', 'M', 'O', 'B', 'I', 'L', 'E',
+    'E', 'F', 'X', 'Y', 'Z', 'A', 'B', 'C',
+    'R', 'G', 'D', 'A', 'R', 'T', 'K', 'L',
+    'Z', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
+  ];
+
+  final List<String> _wordsToFind = [
+    'FLUTTER', // Down (col 0)
+    'APP',     // Across (row 1)
+    'CODE',    // Across (row 2)
+    'WIDGET',  // Across (row 3)
+    'MOBILE',  // Across (row 4)
+    'DART',    // Across (row 6)
+  ];
+
+  // --- Game State ---
+  Set<String> _foundWords = {};
+  List<int> _currentSelection = []; // Track indices the user has tapped
+  Set<int> _permanentlyHighlighted = {}; // Indices of correctly found words
+
+  // Stats
+  int _totalSubmissions = 0;
+  int _correctSubmissions = 0;
+  
+  // Timer
+  late Stopwatch _stopwatch;
+  late Timer _timer;
 
   @override
   void initState() {
     super.initState();
-    _buildGrid();
-    _startTimer();
+    _stopwatch = Stopwatch()..start();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
-    for (final c in _controllers.values) c.dispose();
-    for (final f in _focusNodes.values) f.dispose();
+    _timer.cancel();
+    _stopwatch.stop();
     super.dispose();
   }
 
-  void _startTimer() {
-    _timer?.cancel();
-    _secondsElapsed = 0;
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() => _secondsElapsed++);
+  // --- Logic ---
+
+  bool _isAdjacent(int index1, int index2) {
+    int r1 = index1 ~/ _gridCols;
+    int c1 = index1 % _gridCols;
+    int r2 = index2 ~/ _gridCols;
+    int c2 = index2 % _gridCols;
+    // Check if the new tap is touching the previous one (horizontally, vertically, or diagonally)
+    return (r1 - r2).abs() <= 1 && (c1 - c2).abs() <= 1;
+  }
+
+  void _onCellTapped(int index) {
+    if (_permanentlyHighlighted.contains(index)) return; // Already solved
+
+    setState(() {
+      if (_currentSelection.contains(index)) {
+        // Allow un-selecting the very last letter tapped
+        if (_currentSelection.last == index) {
+          _currentSelection.removeLast();
+        }
+      } else {
+        // Enforce that they tap letters in a continuous chain
+        if (_currentSelection.isEmpty || _isAdjacent(_currentSelection.last, index)) {
+          _currentSelection.add(index);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Select adjacent letters to form a word!'),
+              duration: Duration(milliseconds: 1500),
+            )
+          );
+        }
+      }
     });
   }
 
-  String get _formattedTime {
-    final m = _secondsElapsed ~/ 60;
-    final s = _secondsElapsed % 60;
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
-  }
+  void _submitWord() {
+    if (_currentSelection.isEmpty) return;
 
-  int get _accuracyPercentage {
-    if (_totalLetters == 0) return 100;
-    final totalAttempts = _totalLetters + _mistakesMade;
-    return ((_totalLetters / totalAttempts) * 100).round();
-  }
+    setState(() {
+      _totalSubmissions++;
+      
+      // Build the string from the selected indices
+      String selectedWord = _currentSelection.map((i) => _gridLetters[i]).join();
+      String reversedWord = selectedWord.split('').reversed.join('');
 
-  String _key(int r, int c) => '$r-$c';
+      bool isMatch = _wordsToFind.contains(selectedWord) || _wordsToFind.contains(reversedWord);
+      bool isAlreadyFound = _foundWords.contains(selectedWord) || _foundWords.contains(reversedWord);
 
-  void _buildGrid() {
-    _grid = List.generate(
-      _gridRows,
-      (_) => List.generate(_gridCols, (_) => _Cell()),
-    );
-    _totalLetters = 0;
-
-    for (final entry in _puzzleEntries) {
-      for (int i = 0; i < entry.answer.length; i++) {
-        final r = entry.direction == Direction.down ? entry.row + i : entry.row;
-        final c = entry.direction == Direction.across ? entry.col + i : entry.col;
-        final letter = entry.answer[i];
-        final cell = _grid[r][c];
-        
-        if (cell.correctLetter == null) {
-          cell.correctLetter = letter;
-          _totalLetters++;
-        }
+      if (isMatch && !isAlreadyFound) {
+        _correctSubmissions++;
+        _foundWords.add(selectedWord); // or reversedWord, both count as finding it
+        _permanentlyHighlighted.addAll(_currentSelection);
+        _currentSelection.clear();
+        _checkWinCondition();
+      } else {
+        // Wrong attempt
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isAlreadyFound ? 'Already found that word!' : 'Not a valid hidden word.'),
+            backgroundColor: Colors.red.shade400,
+            duration: const Duration(seconds: 1),
+          )
+        );
+        _currentSelection.clear();
       }
-    }
-
-    for (int r = 0; r < _gridRows; r++) {
-      for (int c = 0; c < _gridCols; c++) {
-        if (!_grid[r][c].isBlocked) {
-          _controllers[_key(r, c)] = TextEditingController();
-          _focusNodes[_key(r, c)] = FocusNode();
-        }
-      }
-    }
-
-    bool blocked(int r, int c) {
-      if (r < 0 || r >= _gridRows || c < 0 || c >= _gridCols) return true;
-      return _grid[r][c].isBlocked;
-    }
-
-    int nextNumber = 1;
-    final Map<String, int> numberAt = {};
-    for (int r = 0; r < _gridRows; r++) {
-      for (int c = 0; c < _gridCols; c++) {
-        if (_grid[r][c].isBlocked) continue;
-        final startsAcross = blocked(r, c - 1) && !blocked(r, c + 1);
-        final startsDown = blocked(r - 1, c) && !blocked(r + 1, c);
-        if (startsAcross || startsDown) {
-          _grid[r][c].number = nextNumber;
-          numberAt[_key(r, c)] = nextNumber;
-          nextNumber++;
-        }
-      }
-    }
-
-    _numberedEntries = _puzzleEntries
-        .map((e) => _NumberedEntry(e, numberAt[_key(e.row, e.col)]!))
-        .toList()
-      ..sort((a, b) {
-        final byNumber = a.number.compareTo(b.number);
-        if (byNumber != 0) return byNumber;
-        return a.entry.direction.index.compareTo(b.entry.direction.index);
-      });
+    });
   }
 
-  void _onLetterChanged(int r, int c, String value) {
-    final upper = value.toUpperCase();
-    final cell = _grid[r][c];
+  void _checkWinCondition() {
+    if (_foundWords.length == _wordsToFind.length) {
+      _stopwatch.stop();
+      _timer.cancel();
+      
+      int accuracy = ((_correctSubmissions / _totalSubmissions) * 100).round();
+      String timeStr = _formatTime(_stopwatch.elapsed.inSeconds);
 
-    // Track mistakes if they typed a wrong letter
-    if (upper.isNotEmpty && upper != cell.correctLetter && cell.userInput != upper) {
-      _mistakesMade++;
-    }
-
-    cell.userInput = upper;
-    setState(() {});
-    
-    if (upper.isNotEmpty) {
-      _advanceFocus(r, c);
-    }
-    _checkForWin();
-  }
-
-  void _advanceFocus(int r, int c) {
-    if (c + 1 < _gridCols && !_grid[r][c + 1].isBlocked) {
-      _focusNodes[_key(r, c + 1)]?.requestFocus();
-    } else if (r + 1 < _gridRows && !_grid[r + 1][c].isBlocked) {
-      _focusNodes[_key(r + 1, c)]?.requestFocus();
-    } else {
-      _focusNodes[_key(r, c)]?.unfocus();
-    }
-  }
-
-  bool _isCellCorrect(int r, int c) {
-    final cell = _grid[r][c];
-    if (cell.isBlocked) return true;
-    return cell.userInput.isNotEmpty && cell.userInput == cell.correctLetter;
-  }
-
-  bool _isCellWrong(int r, int c) {
-    final cell = _grid[r][c];
-    if (cell.isBlocked) return true;
-    return cell.userInput.isNotEmpty && cell.userInput != cell.correctLetter;
-  }
-
-  void _checkForWin() {
-    for (int r = 0; r < _gridRows; r++) {
-      for (int c = 0; c < _gridCols; c++) {
-        if (!_isCellCorrect(r, c)) return;
-      }
-    }
-    if (!_solvedPuzzle) {
-      _solvedPuzzle = true;
-      _timer?.cancel();
-      WidgetsBinding.instance.addPostFrameCallback((_) => _showWinDialog());
-    }
-  }
-
-  void _showWinDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        title: const Text('🎉 Solved it!'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Time: $_formattedTime'),
-            const SizedBox(height: 8),
-            Text('Accuracy: $_accuracyPercentage%'),
-            const SizedBox(height: 8),
-            Text('Mistakes: $_mistakesMade'),
-            const SizedBox(height: 8),
-            Text('Hints Used: ${_totalHintsAllowed - _hintsRemaining}'),
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AlertDialog(
+          title: const Text('🎉 Puzzle Complete!'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Time: $timeStr', style: const TextStyle(fontSize: 18)),
+              const SizedBox(height: 8),
+              Text('Accuracy: $accuracy%', style: const TextStyle(fontSize: 18)),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _resetGame();
+              },
+              child: const Text('Play Again'),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pop();
-            },
-            child: const Text('Exit'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _resetGame();
-            },
-            child: const Text('Play again'),
-          ),
-        ],
-      ),
-    );
+      );
+    }
   }
 
   void _resetGame() {
     setState(() {
-      _hintsRemaining = _totalHintsAllowed;
-      _solvedPuzzle = false;
-      _mistakesMade = 0;
-      for (final row in _grid) {
-        for (final cell in row) {
-          cell.userInput = '';
-          cell.isRevealedByHint = false;
-        }
-      }
-      for (final c in _controllers.values) c.clear();
-      for (final ne in _numberedEntries) ne.hintsUsed = 0;
+      _foundWords.clear();
+      _currentSelection.clear();
+      _permanentlyHighlighted.clear();
+      _totalSubmissions = 0;
+      _correctSubmissions = 0;
+      _stopwatch.reset();
+      _stopwatch.start();
+      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (mounted) setState(() {});
+      });
     });
-    _startTimer();
   }
 
-  void _useHint(_NumberedEntry numberedEntry) {
-    if (_hintsRemaining <= 0) return;
-
-    final entry = numberedEntry.entry;
-    for (int i = 0; i < entry.answer.length; i++) {
-      final r = entry.direction == Direction.down ? entry.row + i : entry.row;
-      final c = entry.direction == Direction.across ? entry.col + i : entry.col;
-      final cell = _grid[r][c];
-      
-      if (cell.userInput != cell.correctLetter) {
-        setState(() {
-          cell.userInput = cell.correctLetter!;
-          cell.isRevealedByHint = true;
-          _controllers[_key(r, c)]?.text = cell.correctLetter!;
-          _hintsRemaining--;
-          numberedEntry.hintsUsed++;
-        });
-        _checkForWin();
-        return;
-      }
-    }
+  String _formatTime(int totalSeconds) {
+    int m = totalSeconds ~/ 60;
+    int s = totalSeconds % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
-  bool _isEntrySolved(_NumberedEntry ne) {
-    final entry = ne.entry;
-    for (int i = 0; i < entry.answer.length; i++) {
-      final r = entry.direction == Direction.down ? entry.row + i : entry.row;
-      final c = entry.direction == Direction.across ? entry.col + i : entry.col;
-      if (_grid[r][c].userInput != _grid[r][c].correctLetter) return false;
-    }
-    return true;
-  }
+  // --- UI Building ---
 
   @override
   Widget build(BuildContext context) {
-    final wideLayout = MediaQuery.of(context).size.width >= 760;
-
-    final sidebar = _HintSidebar(
-      entries: _numberedEntries,
-      hintsRemaining: _hintsRemaining,
-      totalHints: _totalHintsAllowed,
-      isEntrySolved: _isEntrySolved,
-      onHintRequested: _useHint,
-    );
+    int accuracy = _totalSubmissions == 0 
+        ? 100 
+        : ((_correctSubmissions / _totalSubmissions) * 100).round();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Crossword'),
-        actions: [
-          IconButton(
-            tooltip: 'Restart',
-            icon: const Icon(Icons.refresh),
-            onPressed: _resetGame,
-          ),
-          if (!wideLayout)
-            Builder(
-              builder: (context) => IconButton(
-                tooltip: 'Hints',
-                icon: const Icon(Icons.lightbulb_outline),
-                onPressed: () => Scaffold.of(context).openEndDrawer(),
-              ),
-            ),
-        ],
+        title: const Text('Word Search'),
+        centerTitle: true,
       ),
-      endDrawer: wideLayout ? null : Drawer(child: SafeArea(child: sidebar)),
       body: SafeArea(
         child: Column(
           children: [
-            // Stats Bar
+            // 1. Stats Bar
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-              color: Colors.grey.shade100,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              color: Colors.blue.shade50,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.timer_outlined, size: 20),
+                      const Icon(Icons.timer, color: Colors.blue),
                       const SizedBox(width: 8),
-                      Text(_formattedTime, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text(
+                        _formatTime(_stopwatch.elapsed.inSeconds),
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
                     ],
                   ),
                   Row(
                     children: [
-                      const Icon(Icons.analytics_outlined, size: 20),
+                      const Icon(Icons.track_changes, color: Colors.blue),
                       const SizedBox(width: 8),
-                      Text('Accuracy: $_accuracyPercentage%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text(
+                        'Accuracy: $accuracy%',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
                     ],
                   ),
                 ],
               ),
             ),
+
+            // 2. Word Bank
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                alignment: WrapAlignment.center,
+                children: _wordsToFind.map((word) {
+                  bool isFound = _foundWords.contains(word);
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isFound ? Colors.green.shade100 : Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      word,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: isFound ? Colors.green.shade700 : Colors.black87,
+                        decoration: isFound ? TextDecoration.lineThrough : TextDecoration.none,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+
+            // 3. The Grid (Responsive and scaled)
             Expanded(
-              child: wideLayout
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: Center(child: _buildScrollableGrid())),
-                        SizedBox(
-                          width: 300,
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: sidebar,
+              child: Center(
+                child: AspectRatio(
+                  aspectRatio: 1, // Keeps the grid perfectly square
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: GridView.builder(
+                      physics: const NeverScrollableScrollPhysics(), // Prevents scrolling issues
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: _gridCols,
+                        crossAxisSpacing: 4,
+                        mainAxisSpacing: 4,
+                      ),
+                      itemCount: _gridLetters.length,
+                      itemBuilder: (context, index) {
+                        bool isSelected = _currentSelection.contains(index);
+                        bool isFound = _permanentlyHighlighted.contains(index);
+
+                        Color bgColor = Colors.white;
+                        Color textColor = Colors.black87;
+
+                        if (isFound) {
+                          bgColor = Colors.green.shade300;
+                          textColor = Colors.white;
+                        } else if (isSelected) {
+                          bgColor = Colors.blue.shade300;
+                          textColor = Colors.white;
+                        }
+
+                        return GestureDetector(
+                          onTap: () => _onCellTapped(index),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            decoration: BoxDecoration(
+                              color: bgColor,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isSelected || isFound ? Colors.transparent : Colors.grey.shade300,
+                              ),
+                              boxShadow: isSelected || isFound
+                                  ? [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(2, 2))]
+                                  : [],
+                            ),
+                            child: Center(
+                              child: Text(
+                                _gridLetters[index],
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: textColor,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
-                    )
-                  : Center(child: _buildScrollableGrid()),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // 4. Controls
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _currentSelection.isEmpty 
+                          ? null 
+                          : () => setState(() => _currentSelection.clear()),
+                      icon: const Icon(Icons.clear),
+                      label: const Text('Clear'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        foregroundColor: Colors.red,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton.icon(
+                      onPressed: _currentSelection.isEmpty ? null : _submitWord,
+                      icon: const Icon(Icons.check),
+                      label: const Text('Submit Word'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  // Nested scroll views fix the right-side overflow issue
-  Widget _buildScrollableGrid() {
-    return SingleChildScrollView(
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.all(16),
-        child: _buildGridWidget(),
-      ),
-    );
-  }
-
-  Widget _buildGridWidget() {
-    const cellSize = 46.0;
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: List.generate(_gridRows, (r) {
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: List.generate(_gridCols, (c) {
-              final cell = _grid[r][c];
-              if (cell.isBlocked) {
-                return const SizedBox(width: cellSize, height: cellSize);
-              }
-              
-              final correct = _isCellCorrect(r, c);
-              final wrong = _isCellWrong(r, c);
-
-              Color fillColor = Colors.white;
-              if (cell.isRevealedByHint) fillColor = Colors.amber.shade100;
-              else if (correct) fillColor = Colors.green.shade100;
-              else if (wrong) fillColor = Colors.red.shade50;
-
-              return Container(
-                width: cellSize,
-                height: cellSize,
-                margin: const EdgeInsets.all(1),
-                decoration: BoxDecoration(
-                  color: fillColor,
-                  border: Border.all(color: Colors.black87, width: 1),
-                ),
-                child: Stack(
-                  children: [
-                    if (cell.number != null)
-                      Positioned(
-                        left: 2,
-                        top: 1,
-                        child: Text(
-                          '${cell.number}',
-                          style: const TextStyle(fontSize: 9, color: Colors.black54),
-                        ),
-                      ),
-                    Center(
-                      child: SizedBox(
-                        width: cellSize - 6,
-                        height: cellSize - 6,
-                        child: TextField(
-                          controller: _controllers[_key(r, c)],
-                          focusNode: _focusNodes[_key(r, c)],
-                          textAlign: TextAlign.center,
-                          maxLength: 1,
-                          textCapitalization: TextCapitalization.characters,
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                          inputFormatters: [
-                            LengthLimitingTextInputFormatter(1),
-                            FilteringTextInputFormatter.allow(RegExp('[a-zA-Z]')),
-                          ],
-                          decoration: const InputDecoration(
-                            counterText: '',
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                          onChanged: (v) => _onLetterChanged(r, c, v),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-          );
-        }),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Hint Sidebar
-// ---------------------------------------------------------------------------
-
-class _HintSidebar extends StatelessWidget {
-  final List<_NumberedEntry> entries;
-  final int hintsRemaining;
-  final int totalHints;
-  final bool Function(_NumberedEntry) isEntrySolved;
-  final void Function(_NumberedEntry) onHintRequested;
-
-  const _HintSidebar({
-    required this.entries,
-    required this.hintsRemaining,
-    required this.totalHints,
-    required this.isEntrySolved,
-    required this.onHintRequested,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final across = entries.where((e) => e.entry.direction == Direction.across);
-    final down = entries.where((e) => e.entry.direction == Direction.down);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            children: [
-              const Icon(Icons.lightbulb, color: Colors.amber),
-              const SizedBox(width: 8),
-              Text(
-                'Hints: $hintsRemaining / $totalHints',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-            ],
-          ),
-        ),
-        LinearProgressIndicator(
-          value: totalHints == 0 ? 0 : hintsRemaining / totalHints,
-          minHeight: 6,
-          backgroundColor: Colors.grey.shade300,
-        ),
-        const SizedBox(height: 12),
-        Expanded(
-          child: ListView(
-            children: [
-              if (across.isNotEmpty) const _SectionHeader('Across'),
-              ...across.map((e) => _ClueTile(
-                    entry: e,
-                    solved: isEntrySolved(e),
-                    disabled: hintsRemaining <= 0,
-                    onHint: () => onHintRequested(e),
-                  )),
-              const SizedBox(height: 12),
-              if (down.isNotEmpty) const _SectionHeader('Down'),
-              ...down.map((e) => _ClueTile(
-                    entry: e,
-                    solved: isEntrySolved(e),
-                    disabled: hintsRemaining <= 0,
-                    onHint: () => onHintRequested(e),
-                  )),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  const _SectionHeader(this.title);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 14,
-          color: Colors.grey,
-          letterSpacing: 1.1,
-        ),
-      ),
-    );
-  }
-}
-
-class _ClueTile extends StatelessWidget {
-  final _NumberedEntry entry;
-  final bool solved;
-  final bool disabled;
-  final VoidCallback onHint;
-
-  const _ClueTile({
-    required this.entry,
-    required this.solved,
-    required this.disabled,
-    required this.onHint,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      color: solved ? Colors.green.shade50 : null,
-      child: ListTile(
-        dense: true,
-        leading: CircleAvatar(
-          radius: 14,
-          backgroundColor: solved ? Colors.green : Colors.blueGrey.shade100,
-          child: Text(
-            '${entry.number}',
-            style: TextStyle(
-              fontSize: 12,
-              color: solved ? Colors.white : Colors.black87,
-            ),
-          ),
-        ),
-        title: Text(
-          entry.entry.clue,
-          style: TextStyle(
-            decoration: solved ? TextDecoration.lineThrough : null,
-          ),
-        ),
-        trailing: solved
-            ? const Icon(Icons.check_circle, color: Colors.green)
-            : IconButton(
-                icon: const Icon(Icons.lightbulb_outline),
-                tooltip: 'Reveal next letter',
-                onPressed: disabled ? null : onHint,
-              ),
       ),
     );
   }
