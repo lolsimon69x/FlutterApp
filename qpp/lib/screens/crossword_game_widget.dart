@@ -1,5 +1,121 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+// NOTE: This file requires the `google_fonts` package so that Assamese
+// (Bengali-Assamese script) and Manipuri (Meetei Mayek script) render
+// correctly on every device, even ones without those fonts installed.
+// Add this to your pubspec.yaml:
+//
+//   dependencies:
+//     google_fonts: ^6.2.1
+
+enum PuzzleLanguage { assamese, manipuri }
+
+/// Holds everything that differs between languages: the grid, the target
+/// words, their English glosses (shown so players know what they're
+/// hunting for), and the font used to render the script correctly.
+class _LanguagePack {
+  final String languageLabel; // name of the language, in its own script
+  final String languageLabelEnglish;
+  final int gridCols;
+  final List<String> gridLetters; // each entry is one grapheme "cell"
+  final List<String> wordsToFind;
+  final Map<String, String> glosses; // word -> English meaning
+  final TextStyle Function({double? fontSize, FontWeight? fontWeight, Color? color}) fontBuilder;
+
+  const _LanguagePack({
+    required this.languageLabel,
+    required this.languageLabelEnglish,
+    required this.gridCols,
+    required this.gridLetters,
+    required this.wordsToFind,
+    required this.glosses,
+    required this.fontBuilder,
+  });
+}
+
+TextStyle _assameseFont({double? fontSize, FontWeight? fontWeight, Color? color}) {
+  return GoogleFonts.notoSansBengali(fontSize: fontSize, fontWeight: fontWeight, color: color);
+}
+
+TextStyle _manipuriFont({double? fontSize, FontWeight? fontWeight, Color? color}) {
+  return GoogleFonts.notoSansMeeteiMayek(fontSize: fontSize, fontWeight: fontWeight, color: color);
+}
+
+// --- Assamese pack -----------------------------------------------------
+// Words are laid out one per row, left to right, exactly like the
+// original puzzle. Each grid "letter" is a full grapheme cluster
+// (consonant + vowel sign together) since that's the unit a reader
+// actually perceives as one character in this script.
+final _LanguagePack _assamesePack = _LanguagePack(
+  languageLabel: 'অসমীয়া',
+  languageLabelEnglish: 'Assamese',
+  gridCols: 8,
+  fontBuilder: _assameseFont,
+  wordsToFind: const ['অসম', 'পানী', 'বাঘ', 'জোনাক', 'অসমীয়া', 'গাখীৰ'],
+  glosses: const {
+    'অসম': 'Assam',
+    'পানী': 'Water',
+    'বাঘ': 'Tiger',
+    'জোনাক': 'Firefly',
+    'অসমীয়া': 'Assamese',
+    'গাখীৰ': 'Milk',
+  },
+  gridLetters: const [
+    // Row 0: অসম (Assam)
+    'অ', 'স', 'ম', 'ক', 'খ', 'গ', 'ঘ', 'চ',
+    // Row 1: পানী (water)
+    'পা', 'নী', 'ছ', 'জ', 'ঝ', 'ট', 'ঠ', 'ড',
+    // Row 2: বাঘ (tiger)
+    'বা', 'ঘ', 'ঢ', 'ণ', 'ত', 'থ', 'দ', 'ধ',
+    // Row 3: জোনাক (firefly)
+    'জো', 'না', 'ক', 'ন', 'প', 'ফ', 'ব', 'ভ',
+    // Row 4: অসমীয়া (Assamese)
+    'অ', 'স', 'মী', 'য়া', 'ম', 'য', 'ৰ', 'ল',
+    // Row 5: গাখীৰ (milk)
+    'গা', 'খী', 'ৰ', 'ৱ', 'শ', 'ষ', 'স', 'হ',
+    // Row 6: filler
+    'ক', 'খ', 'গ', 'ঘ', 'চ', 'ছ', 'জ', 'ঝ',
+    // Row 7: filler
+    'ট', 'ঠ', 'ড', 'ঢ', 'ণ', 'ত', 'থ', 'দ',
+  ],
+);
+
+// --- Manipuri (Meetei Mayek) pack ---------------------------------------
+final _LanguagePack _manipuriPack = _LanguagePack(
+  languageLabel: 'ꯃꯩꯇꯩꯂꯣꯟ',
+  languageLabelEnglish: 'Manipuri (Meetei Mayek)',
+  gridCols: 8,
+  fontBuilder: _manipuriFont,
+  wordsToFind: const ['ꯃꯩꯇꯩ', 'ꯃꯅꯤꯄꯨꯔ', 'ꯅꯨꯃꯤꯠ', 'ꯀꯪꯂꯥꯁꯥ', 'ꯆꯤꯡ', 'ꯍꯣꯢ'],
+  glosses: const {
+    'ꯃꯩꯇꯩ': 'Meitei',
+    'ꯃꯅꯤꯄꯨꯔ': 'Manipur',
+    'ꯅꯨꯃꯤꯠ': 'Sun',
+    'ꯀꯪꯂꯥꯁꯥ': 'Kanglasha',
+    'ꯆꯤꯡ': 'Hill',
+    'ꯍꯣꯢ': 'Yes',
+  },
+  gridLetters: const [
+    // Row 0: ꯃꯩꯇꯩ (Meitei)
+    'ꯃꯩ', 'ꯇꯩ', 'ꯀ', 'ꯈ', 'ꯒ', 'ꯆ', 'ꯖ', 'ꯇ',
+    // Row 1: ꯃꯅꯤꯄꯨꯔ (Manipur)
+    'ꯃ', 'ꯅꯤ', 'ꯄꯨ', 'ꯔ', 'ꯊ', 'ꯗ', 'ꯅ', 'ꯄ',
+    // Row 2: ꯅꯨꯃꯤꯠ (Sun)
+    'ꯅꯨ', 'ꯃꯤ', 'ꯠ', 'ꯕ', 'ꯃ', 'ꯌ', 'ꯔ', 'ꯂ',
+    // Row 3: ꯀꯪꯂꯥꯁꯥ (Kanglasha)
+    'ꯀꯪ', 'ꯂꯥ', 'ꯁꯥ', 'ꯋ', 'ꯁ', 'ꯍ', 'ꯑ', 'ꯏ',
+    // Row 4: ꯆꯤꯡ (Hill)
+    'ꯆꯤ', 'ꯪ', 'ꯎ', 'ꯀ', 'ꯈ', 'ꯒ', 'ꯆ', 'ꯖ',
+    // Row 5: ꯍꯣꯢ (Yes)
+    'ꯍꯣ', 'ꯢ', 'ꯇ', 'ꯊ', 'ꯗ', 'ꯅ', 'ꯄ', 'ꯕ',
+    // Row 6: filler
+    'ꯃ', 'ꯌ', 'ꯔ', 'ꯂ', 'ꯋ', 'ꯁ', 'ꯍ', 'ꯑ',
+    // Row 7: filler
+    'ꯏ', 'ꯎ', 'ꯀ', 'ꯈ', 'ꯒ', 'ꯆ', 'ꯖ', 'ꯇ',
+  ],
+);
 
 class WordSearchGamePage extends StatefulWidget {
   const WordSearchGamePage({super.key});
@@ -9,29 +125,15 @@ class WordSearchGamePage extends StatefulWidget {
 }
 
 class _WordSearchGamePageState extends State<WordSearchGamePage> {
-  // --- Game Data ---
-  final int _gridCols = 8;
-  
-  // An 8x8 grid filled with letters containing hidden words
-  final List<String> _gridLetters = [
-    'F', 'A', 'Q', 'W', 'E', 'R', 'T', 'Y',
-    'L', 'A', 'P', 'P', 'K', 'L', 'M', 'N',
-    'U', 'B', 'C', 'O', 'D', 'E', 'G', 'H',
-    'T', 'D', 'W', 'I', 'D', 'G', 'E', 'T',
-    'T', 'E', 'M', 'O', 'B', 'I', 'L', 'E',
-    'E', 'F', 'X', 'Y', 'Z', 'A', 'B', 'C',
-    'R', 'G', 'D', 'A', 'R', 'T', 'K', 'L',
-    'Z', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
-  ];
+  // --- Language / Game Data ---
+  PuzzleLanguage _language = PuzzleLanguage.assamese;
 
-  final List<String> _wordsToFind = [
-    'FLUTTER', // Down (col 0)
-    'APP',     // Across (row 1)
-    'CODE',    // Across (row 2)
-    'WIDGET',  // Across (row 3)
-    'MOBILE',  // Across (row 4)
-    'DART',    // Across (row 6)
-  ];
+  _LanguagePack get _pack =>
+      _language == PuzzleLanguage.assamese ? _assamesePack : _manipuriPack;
+
+  int get _gridCols => _pack.gridCols;
+  List<String> get _gridLetters => _pack.gridLetters;
+  List<String> get _wordsToFind => _pack.wordsToFind;
 
   // --- Game State ---
   Set<String> _foundWords = {};
@@ -41,7 +143,7 @@ class _WordSearchGamePageState extends State<WordSearchGamePage> {
   // Stats
   int _totalSubmissions = 0;
   int _correctSubmissions = 0;
-  
+
   // Timer
   late Stopwatch _stopwatch;
   late Timer _timer;
@@ -91,7 +193,7 @@ class _WordSearchGamePageState extends State<WordSearchGamePage> {
             const SnackBar(
               content: Text('Select adjacent letters to form a word!'),
               duration: Duration(milliseconds: 1500),
-            )
+            ),
           );
         }
       }
@@ -103,10 +205,14 @@ class _WordSearchGamePageState extends State<WordSearchGamePage> {
 
     setState(() {
       _totalSubmissions++;
-      
-      // Build the string from the selected indices
+
+      // Build the string from the selected cells (each cell may be a
+      // multi-codepoint grapheme cluster, e.g. a consonant + vowel sign).
       String selectedWord = _currentSelection.map((i) => _gridLetters[i]).join();
-      String reversedWord = selectedWord.split('').reversed.join('');
+      // Reverse by cell, not by UTF-16 code unit, so multi-codepoint
+      // clusters (used by Assamese and Manipuri script) don't get corrupted.
+      String reversedWord =
+          _currentSelection.reversed.map((i) => _gridLetters[i]).join();
 
       bool isMatch = _wordsToFind.contains(selectedWord) || _wordsToFind.contains(reversedWord);
       bool isAlreadyFound = _foundWords.contains(selectedWord) || _foundWords.contains(reversedWord);
@@ -124,7 +230,7 @@ class _WordSearchGamePageState extends State<WordSearchGamePage> {
             content: Text(isAlreadyFound ? 'Already found that word!' : 'Not a valid hidden word.'),
             backgroundColor: Colors.red.shade400,
             duration: const Duration(seconds: 1),
-          )
+          ),
         );
         _currentSelection.clear();
       }
@@ -135,7 +241,7 @@ class _WordSearchGamePageState extends State<WordSearchGamePage> {
     if (_foundWords.length == _wordsToFind.length) {
       _stopwatch.stop();
       _timer.cancel();
-      
+
       int accuracy = ((_correctSubmissions / _totalSubmissions) * 100).round();
       String timeStr = _formatTime(_stopwatch.elapsed.inSeconds);
 
@@ -176,10 +282,19 @@ class _WordSearchGamePageState extends State<WordSearchGamePage> {
       _correctSubmissions = 0;
       _stopwatch.reset();
       _stopwatch.start();
+      _timer.cancel();
       _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
         if (mounted) setState(() {});
       });
     });
+  }
+
+  void _switchLanguage(PuzzleLanguage newLanguage) {
+    if (newLanguage == _language) return;
+    setState(() {
+      _language = newLanguage;
+    });
+    _resetGame();
   }
 
   String _formatTime(int totalSeconds) {
@@ -192,9 +307,11 @@ class _WordSearchGamePageState extends State<WordSearchGamePage> {
 
   @override
   Widget build(BuildContext context) {
-    int accuracy = _totalSubmissions == 0 
-        ? 100 
+    int accuracy = _totalSubmissions == 0
+        ? 100
         : ((_correctSubmissions / _totalSubmissions) * 100).round();
+
+    final pack = _pack;
 
     return Scaffold(
       appBar: AppBar(
@@ -204,8 +321,34 @@ class _WordSearchGamePageState extends State<WordSearchGamePage> {
       body: SafeArea(
         child: Column(
           children: [
+            // 0. Language switcher
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: SegmentedButton<PuzzleLanguage>(
+                segments: [
+                  ButtonSegment(
+                    value: PuzzleLanguage.assamese,
+                    label: Text(
+                      _assamesePack.languageLabel,
+                      style: _assameseFont(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  ButtonSegment(
+                    value: PuzzleLanguage.manipuri,
+                    label: Text(
+                      _manipuriPack.languageLabel,
+                      style: _manipuriFont(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+                selected: {_language},
+                onSelectionChanged: (selection) => _switchLanguage(selection.first),
+              ),
+            ),
+
             // 1. Stats Bar
             Container(
+              margin: const EdgeInsets.only(top: 12),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               color: Colors.blue.shade50,
               child: Row(
@@ -235,7 +378,7 @@ class _WordSearchGamePageState extends State<WordSearchGamePage> {
               ),
             ),
 
-            // 2. Word Bank
+            // 2. Word Bank (script word + English gloss)
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Wrap(
@@ -250,13 +393,27 @@ class _WordSearchGamePageState extends State<WordSearchGamePage> {
                       color: isFound ? Colors.green.shade100 : Colors.grey.shade200,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
-                      word,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: isFound ? Colors.green.shade700 : Colors.black87,
-                        decoration: isFound ? TextDecoration.lineThrough : TextDecoration.none,
-                      ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          word,
+                          style: pack.fontBuilder(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isFound ? Colors.green.shade700 : Colors.black87,
+                          ).copyWith(
+                            decoration: isFound ? TextDecoration.lineThrough : TextDecoration.none,
+                          ),
+                        ),
+                        Text(
+                          pack.glosses[word] ?? '',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isFound ? Colors.green.shade700 : Colors.black54,
+                          ),
+                        ),
+                      ],
                     ),
                   );
                 }).toList(),
@@ -304,16 +461,22 @@ class _WordSearchGamePageState extends State<WordSearchGamePage> {
                                 color: isSelected || isFound ? Colors.transparent : Colors.grey.shade300,
                               ),
                               boxShadow: isSelected || isFound
-                                  ? [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(2, 2))]
+                                  ? [const BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(2, 2))]
                                   : [],
                             ),
                             child: Center(
-                              child: Text(
-                                _gridLetters[index],
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  color: textColor,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(2.0),
+                                  child: Text(
+                                    _gridLetters[index],
+                                    style: pack.fontBuilder(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: textColor,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -333,8 +496,8 @@ class _WordSearchGamePageState extends State<WordSearchGamePage> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _currentSelection.isEmpty 
-                          ? null 
+                      onPressed: _currentSelection.isEmpty
+                          ? null
                           : () => setState(() => _currentSelection.clear()),
                       icon: const Icon(Icons.clear),
                       label: const Text('Clear'),
