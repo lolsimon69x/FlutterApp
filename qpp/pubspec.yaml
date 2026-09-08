@@ -41,8 +41,11 @@ dependencies:
   google_fonts: ^6.2.1
   flutter_tts: ^4.0.2
   speech_to_text: ^7.0.0
-  
-  
+  # FOR DATABASE MANAGEMENT 
+  drift: ^2.16.0
+  drift_flutter: ^0.1.0
+  sqlite3_flutter_libs: ^0.5.24
+  connectivity_plus: ^6.0.0   # Detects network change.
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -51,6 +54,9 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  # FOR DATABASE MANAGEMENT 
+  drift_dev: ^2.16.0
+  build_runner: ^2.4.8
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
