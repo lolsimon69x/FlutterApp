@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:qpp/screens/MyHomePage.dart';
 import 'package:qpp/screens/data/local/db_helper.dart';
-
+import 'package:qpp/screens/crossword_game_widget.dart';
 class Loginpage extends StatefulWidget {
   const Loginpage({super.key});
 
@@ -18,6 +18,7 @@ class _LoginpageState extends State<Loginpage> {
   late final DBhelper dBhelper;
 
   @override
+  
   void initState() {
     super.initState();
     textDocId = TextEditingController();
@@ -38,6 +39,15 @@ class _LoginpageState extends State<Loginpage> {
 
   @override
   Widget build(BuildContext context) {
+    void set_language(int language_id){
+    if (language_id==1){
+      (context)=>const WordSearchGamePage(language_id: 1,);
+    }
+    else if (language_id==2){
+      (context)=>const WordSearchGamePage(language_id: 2,);
+    }
+    
+  }
     return Scaffold(
       // Prevents the Scaffold from forcing a rebuild layout cycle on tap
       resizeToAvoidBottomInset: true, 
@@ -54,7 +64,13 @@ class _LoginpageState extends State<Loginpage> {
                 "Please Login the customer using your assigned doctor id",
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 20),
+              ElevatedButton(onPressed:(){
+                set_language(1);
+              },child: Text('অসমীয়া'),)
+              ,const SizedBox(height: 20),ElevatedButton(onPressed:(){
+                set_language(2);
+              },child: Text('ꯃꯅꯤꯄꯨꯔꯤ'),)
+              ,const SizedBox(height: 20),
 
               // Use explicit Key and FocusNode
               TextField(
@@ -68,6 +84,7 @@ class _LoginpageState extends State<Loginpage> {
                 ),
               ),
               const SizedBox(height: 16),
+              
 
               TextField(
                 key: const ValueKey('doc_id_field'),
@@ -81,7 +98,7 @@ class _LoginpageState extends State<Loginpage> {
                 ),
               ),
               const SizedBox(height: 24),
-
+              
               ElevatedButton(
                 onPressed: () async {
                   FocusManager.instance.primaryFocus?.unfocus();
