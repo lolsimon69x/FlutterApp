@@ -2,26 +2,22 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-// NOTE: This file requires the `google_fonts` package so that Assamese
-// (Bengali-Assamese script) and Manipuri (Meetei Mayek script) render
-// correctly on every device, even ones without those fonts installed.
-// Add this to your pubspec.yaml:
+// NOTE: Ensure you have added google_fonts to your pubspec.yaml:
 //
-//   dependencies:
-//     google_fonts: ^6.2.1
+// dependencies:
+//   google_fonts: ^6.2.1
 
 enum PuzzleLanguage { assamese, manipuri }
 
 /// Holds everything that differs between languages: the grid, the target
-/// words, their English glosses (shown so players know what they're
-/// hunting for), and the font used to render the script correctly.
+/// words, their English glosses, and the font builder.
 class _LanguagePack {
-  final String languageLabel; // name of the language, in its own script
+  final String languageLabel;
   final String languageLabelEnglish;
   final int gridCols;
-  final List<String> gridLetters; // each entry is one grapheme "cell"
+  final List<String> gridLetters;
   final List<String> wordsToFind;
-  final Map<String, String> glosses; // word -> English meaning
+  final Map<String, String> glosses;
   final TextStyle Function({double? fontSize, FontWeight? fontWeight, Color? color}) fontBuilder;
 
   const _LanguagePack({
@@ -43,11 +39,7 @@ TextStyle _manipuriFont({double? fontSize, FontWeight? fontWeight, Color? color}
   return GoogleFonts.notoSansMeeteiMayek(fontSize: fontSize, fontWeight: fontWeight, color: color);
 }
 
-// --- Assamese pack -----------------------------------------------------
-// Words are laid out one per row, left to right, exactly like the
-// original puzzle. Each grid "letter" is a full grapheme cluster
-// (consonant + vowel sign together) since that's the unit a reader
-// actually perceives as one character in this script.
+// --- Assamese Pack -----------------------------------------------------
 final _LanguagePack _assamesePack = _LanguagePack(
   languageLabel: 'অসমীয়া',
   languageLabelEnglish: 'Assamese',
@@ -65,15 +57,15 @@ final _LanguagePack _assamesePack = _LanguagePack(
   gridLetters: const [
     // Row 0: অসম (Assam)
     'অ', 'স', 'ম', 'ক', 'খ', 'গ', 'ঘ', 'চ',
-    // Row 1: পানী (water)
+    // Row 1: পানী (Water)
     'পা', 'নী', 'ছ', 'জ', 'ঝ', 'ট', 'ঠ', 'ড',
-    // Row 2: বাঘ (tiger)
+    // Row 2: বাঘ (Tiger)
     'বা', 'ঘ', 'ঢ', 'ণ', 'ত', 'থ', 'দ', 'ধ',
-    // Row 3: জোনাক (firefly)
+    // Row 3: জোনাক (Firefly)
     'জো', 'না', 'ক', 'ন', 'প', 'ফ', 'ব', 'ভ',
     // Row 4: অসমীয়া (Assamese)
     'অ', 'স', 'মী', 'য়া', 'ম', 'য', 'ৰ', 'ল',
-    // Row 5: গাখীৰ (milk)
+    // Row 5: গাখীৰ (Milk)
     'গা', 'খী', 'ৰ', 'ৱ', 'শ', 'ষ', 'স', 'হ',
     // Row 6: filler
     'ক', 'খ', 'গ', 'ঘ', 'চ', 'ছ', 'জ', 'ঝ',
@@ -82,7 +74,7 @@ final _LanguagePack _assamesePack = _LanguagePack(
   ],
 );
 
-// --- Manipuri (Meetei Mayek) pack ---------------------------------------
+// --- Manipuri (Meetei Mayek) Pack ---------------------------------------
 final _LanguagePack _manipuriPack = _LanguagePack(
   languageLabel: 'ꯃꯩꯇꯩꯂꯣꯟ',
   languageLabelEnglish: 'Manipuri (Meetei Mayek)',
@@ -103,7 +95,7 @@ final _LanguagePack _manipuriPack = _LanguagePack(
     // Row 1: ꯃꯅꯤꯄꯨꯔ (Manipur)
     'ꯃ', 'ꯅꯤ', 'ꯄꯨ', 'ꯔ', 'ꯊ', 'ꯗ', 'ꯅ', 'ꯄ',
     // Row 2: ꯅꯨꯃꯤꯠ (Sun)
-    'ꯅꯨ', 'ꯃꯤ', 'ꯠ', 'ꯕ', 'ꯃ', 'ꯌ', 'ꯔ', 'ꯂ',
+    'ꯅꨨ', 'ꯃꯤ', 'ꯠ', 'ꯕ', 'ꯃ', 'ꯌ', 'ꯔ', 'ꯂ',
     // Row 3: ꯀꯪꯂꯥꯁꯥ (Kanglasha)
     'ꯀꯪ', 'ꯂꯥ', 'ꯁꯥ', 'ꯋ', 'ꯁ', 'ꯍ', 'ꯑ', 'ꯏ',
     // Row 4: ꯆꯤꯡ (Hill)
@@ -118,7 +110,9 @@ final _LanguagePack _manipuriPack = _LanguagePack(
 );
 
 class WordSearchGamePage extends StatefulWidget {
-  const WordSearchGamePage({super.key});
+  final int language_id;
+
+  const WordSearchGamePage({super.key, this.language_id = 0});
 
   @override
   State<WordSearchGamePage> createState() => _WordSearchGamePageState();
@@ -126,19 +120,17 @@ class WordSearchGamePage extends StatefulWidget {
 
 class _WordSearchGamePageState extends State<WordSearchGamePage> {
   // --- Language / Game Data ---
-  PuzzleLanguage _language = PuzzleLanguage.assamese;
-
-  _LanguagePack get _pack =>
-      _language == PuzzleLanguage.assamese ? _assamesePack : _manipuriPack;
+  late PuzzleLanguage _language;
+  late _LanguagePack _pack; // Stored variable (prevents infinite recursion)
 
   int get _gridCols => _pack.gridCols;
   List<String> get _gridLetters => _pack.gridLetters;
   List<String> get _wordsToFind => _pack.wordsToFind;
 
   // --- Game State ---
-  Set<String> _foundWords = {};
-  List<int> _currentSelection = []; // Track indices the user has tapped
-  Set<int> _permanentlyHighlighted = {}; // Indices of correctly found words
+  final Set<String> _foundWords = {};
+  final List<int> _currentSelection = [];
+  final Set<int> _permanentlyHighlighted = {};
 
   // Stats
   int _totalSubmissions = 0;
@@ -151,10 +143,28 @@ class _WordSearchGamePageState extends State<WordSearchGamePage> {
   @override
   void initState() {
     super.initState();
+    _initLanguagePack();
+
     _stopwatch = Stopwatch()..start();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) setState(() {});
     });
+  }
+
+  void _initLanguagePack() {
+    _language = _getLanguageFromId(widget.language_id);
+    _pack = _language == PuzzleLanguage.assamese ? _assamesePack : _manipuriPack;
+  }
+
+  @override
+  void didUpdateWidget(covariant WordSearchGamePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.language_id != widget.language_id) {
+      setState(() {
+        _initLanguagePack();
+        _resetGame();
+      });
+    }
   }
 
   @override
@@ -164,28 +174,32 @@ class _WordSearchGamePageState extends State<WordSearchGamePage> {
     super.dispose();
   }
 
-  // --- Logic ---
+  // --- Helper Methods ---
+
+  PuzzleLanguage _getLanguageFromId(int id) {
+    if (id == 2) {
+      return PuzzleLanguage.manipuri;
+    }
+    return PuzzleLanguage.assamese;
+  }
 
   bool _isAdjacent(int index1, int index2) {
     int r1 = index1 ~/ _gridCols;
     int c1 = index1 % _gridCols;
     int r2 = index2 ~/ _gridCols;
     int c2 = index2 % _gridCols;
-    // Check if the new tap is touching the previous one (horizontally, vertically, or diagonally)
     return (r1 - r2).abs() <= 1 && (c1 - c2).abs() <= 1;
   }
 
   void _onCellTapped(int index) {
-    if (_permanentlyHighlighted.contains(index)) return; // Already solved
+    if (_permanentlyHighlighted.contains(index)) return;
 
     setState(() {
       if (_currentSelection.contains(index)) {
-        // Allow un-selecting the very last letter tapped
         if (_currentSelection.last == index) {
           _currentSelection.removeLast();
         }
       } else {
-        // Enforce that they tap letters in a continuous chain
         if (_currentSelection.isEmpty || _isAdjacent(_currentSelection.last, index)) {
           _currentSelection.add(index);
         } else {
@@ -206,11 +220,7 @@ class _WordSearchGamePageState extends State<WordSearchGamePage> {
     setState(() {
       _totalSubmissions++;
 
-      // Build the string from the selected cells (each cell may be a
-      // multi-codepoint grapheme cluster, e.g. a consonant + vowel sign).
       String selectedWord = _currentSelection.map((i) => _gridLetters[i]).join();
-      // Reverse by cell, not by UTF-16 code unit, so multi-codepoint
-      // clusters (used by Assamese and Manipuri script) don't get corrupted.
       String reversedWord =
           _currentSelection.reversed.map((i) => _gridLetters[i]).join();
 
@@ -219,12 +229,11 @@ class _WordSearchGamePageState extends State<WordSearchGamePage> {
 
       if (isMatch && !isAlreadyFound) {
         _correctSubmissions++;
-        _foundWords.add(selectedWord); // or reversedWord, both count as finding it
+        _foundWords.add(selectedWord);
         _permanentlyHighlighted.addAll(_currentSelection);
         _currentSelection.clear();
         _checkWinCondition();
       } else {
-        // Wrong attempt
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(isAlreadyFound ? 'Already found that word!' : 'Not a valid hidden word.'),
@@ -289,14 +298,6 @@ class _WordSearchGamePageState extends State<WordSearchGamePage> {
     });
   }
 
-  void _switchLanguage(PuzzleLanguage newLanguage) {
-    if (newLanguage == _language) return;
-    setState(() {
-      _language = newLanguage;
-    });
-    _resetGame();
-  }
-
   String _formatTime(int totalSeconds) {
     int m = totalSeconds ~/ 60;
     int s = totalSeconds % 60;
@@ -311,41 +312,14 @@ class _WordSearchGamePageState extends State<WordSearchGamePage> {
         ? 100
         : ((_correctSubmissions / _totalSubmissions) * 100).round();
 
-    final pack = _pack;
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Word Search'),
+        title: Text('Word Search (${_pack.languageLabelEnglish})'),
         centerTitle: true,
       ),
       body: SafeArea(
         child: Column(
           children: [
-            // 0. Language switcher
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: SegmentedButton<PuzzleLanguage>(
-                segments: [
-                  ButtonSegment(
-                    value: PuzzleLanguage.assamese,
-                    label: Text(
-                      _assamesePack.languageLabel,
-                      style: _assameseFont(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  ButtonSegment(
-                    value: PuzzleLanguage.manipuri,
-                    label: Text(
-                      _manipuriPack.languageLabel,
-                      style: _manipuriFont(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-                selected: {_language},
-                onSelectionChanged: (selection) => _switchLanguage(selection.first),
-              ),
-            ),
-
             // 1. Stats Bar
             Container(
               margin: const EdgeInsets.only(top: 12),
@@ -378,7 +352,7 @@ class _WordSearchGamePageState extends State<WordSearchGamePage> {
               ),
             ),
 
-            // 2. Word Bank (script word + English gloss)
+            // 2. Word Bank (Script Word + English Gloss)
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Wrap(
@@ -398,7 +372,7 @@ class _WordSearchGamePageState extends State<WordSearchGamePage> {
                       children: [
                         Text(
                           word,
-                          style: pack.fontBuilder(
+                          style: _pack.fontBuilder(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                             color: isFound ? Colors.green.shade700 : Colors.black87,
@@ -407,7 +381,7 @@ class _WordSearchGamePageState extends State<WordSearchGamePage> {
                           ),
                         ),
                         Text(
-                          pack.glosses[word] ?? '',
+                          _pack.glosses[word] ?? '',
                           style: TextStyle(
                             fontSize: 11,
                             color: isFound ? Colors.green.shade700 : Colors.black54,
@@ -420,15 +394,15 @@ class _WordSearchGamePageState extends State<WordSearchGamePage> {
               ),
             ),
 
-            // 3. The Grid (Responsive and scaled)
+            // 3. The Grid
             Expanded(
               child: Center(
                 child: AspectRatio(
-                  aspectRatio: 1, // Keeps the grid perfectly square
+                  aspectRatio: 1,
                   child: Padding(
                     padding: const EdgeInsets.all(12.0),
                     child: GridView.builder(
-                      physics: const NeverScrollableScrollPhysics(), // Prevents scrolling issues
+                      physics: const NeverScrollableScrollPhysics(),
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: _gridCols,
                         crossAxisSpacing: 4,
@@ -471,7 +445,7 @@ class _WordSearchGamePageState extends State<WordSearchGamePage> {
                                   padding: const EdgeInsets.all(2.0),
                                   child: Text(
                                     _gridLetters[index],
-                                    style: pack.fontBuilder(
+                                    style: _pack.fontBuilder(
                                       fontSize: 20,
                                       fontWeight: FontWeight.bold,
                                       color: textColor,
