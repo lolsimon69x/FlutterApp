@@ -10,12 +10,18 @@ class Loginpage extends StatefulWidget {
 }
 
 class _LoginpageState extends State<Loginpage> {
-  // MUST be declared here outside build() so they persist across rebuilds
   late final TextEditingController textDocId;
   late final TextEditingController textUserName;
+  late final TextEditingController textEmail;
+  late final TextEditingController textPassword;
+
   late final FocusNode focusUserName;
   late final FocusNode focusDocId;
+  late final FocusNode focusEmail;
+  late final FocusNode focusPassword;
+
   late final DBhelper dBhelper;
+  bool _isPasswordVisible = false;
 
   @override
   
@@ -23,8 +29,14 @@ class _LoginpageState extends State<Loginpage> {
     super.initState();
     textDocId = TextEditingController();
     textUserName = TextEditingController();
+    textEmail = TextEditingController();
+    textPassword = TextEditingController();
+
     focusUserName = FocusNode();
     focusDocId = FocusNode();
+    focusEmail = FocusNode();
+    focusPassword = FocusNode();
+
     dBhelper = DBhelper.getInstance();
   }
 
@@ -32,9 +44,23 @@ class _LoginpageState extends State<Loginpage> {
   void dispose() {
     textDocId.dispose();
     textUserName.dispose();
+    textEmail.dispose();
+    textPassword.dispose();
+
     focusUserName.dispose();
     focusDocId.dispose();
+    focusEmail.dispose();
+    focusPassword.dispose();
     super.dispose();
+  }
+
+  void _setLanguage(int languageId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => WordSearchGamePage(language_id: languageId),
+      ),
+    );
   }
 
   @override
@@ -49,10 +75,9 @@ class _LoginpageState extends State<Loginpage> {
     
   }
     return Scaffold(
-      // Prevents the Scaffold from forcing a rebuild layout cycle on tap
-      resizeToAvoidBottomInset: true, 
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        title: const Text("Patient login"),
+        title: const Text("Patient Login"),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -61,18 +86,29 @@ class _LoginpageState extends State<Loginpage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                "Please Login the customer using your assigned doctor id",
+                "Please login the customer using your assigned doctor ID and credentials",
                 textAlign: TextAlign.center,
               ),
-              ElevatedButton(onPressed:(){
-                set_language(1);
-              },child: Text('অসমীয়া'),)
-              ,const SizedBox(height: 20),ElevatedButton(onPressed:(){
-                set_language(2);
-              },child: Text('ꯃꯅꯤꯄꯨꯔꯤ'),)
-              ,const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
-              // Use explicit Key and FocusNode
+              // Language Selection Buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ElevatedButton(
+                    onPressed: () => _setLanguage(1),
+                    child: const Text('অসমীয়া'),
+                  ),
+                  const SizedBox(width: 16),
+                  ElevatedButton(
+                    onPressed: () => _setLanguage(2),
+                    child: const Text('ꯃꯅꯤꯄꯨꯔꯤ'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Username Field
               TextField(
                 key: const ValueKey('username_field'),
                 controller: textUserName,
@@ -81,11 +117,55 @@ class _LoginpageState extends State<Loginpage> {
                 decoration: const InputDecoration(
                   labelText: "Username",
                   border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.person_outline),
                 ),
               ),
               const SizedBox(height: 16),
               
 
+              // Email Field
+              TextField(
+                key: const ValueKey('email_field'),
+                controller: textEmail,
+                focusNode: focusEmail,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  labelText: "Email Address",
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.email_outlined),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Password Field
+              TextField(
+                key: const ValueKey('password_field'),
+                controller: textPassword,
+                focusNode: focusPassword,
+                obscureText: !_isPasswordVisible,
+                textInputAction: TextInputAction.next,
+                decoration: InputDecoration(
+                  labelText: "Password",
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _isPasswordVisible
+                          ? Icons.visibility
+                          : Icons.visibility_off,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _isPasswordVisible = !_isPasswordVisible;
+                      });
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Doctor ID Field
               TextField(
                 key: const ValueKey('doc_id_field'),
                 controller: textDocId,
@@ -95,22 +175,41 @@ class _LoginpageState extends State<Loginpage> {
                 decoration: const InputDecoration(
                   labelText: "Doctor ID",
                   border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.medical_information_outlined),
                 ),
               ),
               const SizedBox(height: 24),
-              
+
+              // Submit Button
               ElevatedButton(
                 onPressed: () async {
                   FocusManager.instance.primaryFocus?.unfocus();
 
                   final String username = textUserName.text.trim();
+                  final String email = textEmail.text.trim();
+                  final String password = textPassword.text.trim();
                   final String docIdStr = textDocId.text.trim();
 
                   final int? docId = int.tryParse(docIdStr);
-                  if (username.isEmpty || docId == null) {
+
+                  // Validate all inputs
+                  if (username.isEmpty ||
+                      email.isEmpty ||
+                      password.isEmpty ||
+                      docId == null) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text("Please enter a valid username and doctor ID"),
+                        content: Text("Please fill in all fields correctly."),
+                      ),
+                    );
+                    return;
+                  }
+
+                  // Quick email format check
+                  if (!email.contains('@') || !email.contains('.')) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Please enter a valid email address."),
                       ),
                     );
                     return;
@@ -122,18 +221,29 @@ class _LoginpageState extends State<Loginpage> {
                   );
 
                   if (isSuccess && mounted) {
-                    String _username=username;
+                    final String userEmail = email;
+                    final String userPassword = password;
+
                     textUserName.clear();
+                    textEmail.clear();
+                    textPassword.clear();
                     textDocId.clear();
 
+                    // Forward email & password to HomePage (and then to SyncHarnessScreen)
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                        builder: (context) =>  HomePage(),
+                        builder: (context) => HomePage(
+                          userEmail: userEmail,
+                          userPassword: userPassword,
+                        ),
                       ),
                     );
                   }
                 },
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                ),
                 child: const Text("Submit"),
               ),
             ],
