@@ -14,7 +14,7 @@ class SyncService {
   });
 
   // ==========================================
-  //            REMINDERS SYNC (BATCH)
+  //             REMINDERS SYNC (BATCH)
   // ==========================================
 
   /// Pushes un-synced reminders upstream using PooledUserReminderRequest schema.
@@ -76,47 +76,10 @@ class SyncService {
     } catch (e) {
       return;
     }
-
-    // ==============================================================
-    // NOTE: Upstream updates for existing records are disabled for now.
-    // When the backend implements an update route, uncomment below:
-    // ==============================================================
-    /*
-    final updatedLocally = await (db.select(db.reminders)
-          ..where((tbl) => tbl.isSynced.equals(false) & tbl.globalId.isNotNull()))
-        .get();
-
-    for (final reminder in updatedLocally) {
-      try {
-        final response = await http.put(
-          Uri.parse('$backendBaseUrl/myaccount/reminders/${reminder.globalId}'),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $authToken',
-          },
-          body: jsonEncode({
-            'message': reminder.message,
-            'time': reminder.time,
-            'is_completed': reminder.isComplete,
-          }),
-        );
-
-        if (response.statusCode == 200) {
-          await (db.update(db.reminders)
-                ..where((tbl) => tbl.id.equals(reminder.id)))
-              .write(
-            const RemindersCompanion(isSynced: Value(true)),
-          );
-        }
-      } catch (e) {
-        break;
-      }
-    }
-    */
   }
 
   // ==========================================
-  //           GAME SESSIONS SYNC (BATCH)
+  //             GAME SESSIONS SYNC (BATCH)
   // ==========================================
 
   /// Pushes un-synced game sessions upstream using PooledUserGameSessionRequest schema.
@@ -183,8 +146,9 @@ class SyncService {
   //             DOWNSTREAM SYNC
   // ==========================================
 
-  /// Fetches reminders from FastAPI and reconciles them into the local database.
-  Future<void> fetchRemoteReminders(String authToken) async {
+  /// Fetches reminders from FastAPI, reconciles them, and returns the count of newly inserted items.
+  Future<int> fetchRemoteReminders(String authToken) async {
+    int newItemsCount = 0;
     try {
       final response = await http.get(
         Uri.parse('$backendBaseUrl/myaccount/reminders'),
@@ -220,6 +184,7 @@ class SyncService {
                   isSynced: const Value(true),
                 ),
               );
+              newItemsCount++;
             } else if (existing.isSynced) {
               await (db.update(db.reminders)
                     ..where((tbl) => tbl.id.equals(existing.id)))
@@ -236,11 +201,12 @@ class SyncService {
         }
       }
     } on SocketException {
-      return;
+      return 0;
     } on http.ClientException {
-      return;
+      return 0;
     } catch (e) {
-      return;
+      return 0;
     }
+    return newItemsCount;
   }
 }

@@ -58,12 +58,12 @@ class DBhelper {
     required int b,
   }) async {
     var db = await getDB();
-    int row_affected = await db.insert(t_name, {
+    int rowAffected = await db.insert(t_name, {
       q_id: myid,
       q_name: D,
       q_value: b,
     });
-    return row_affected > 0;
+    return rowAffected > 0;
   }
 
   Future<bool> add_user_entry({
@@ -71,11 +71,11 @@ class DBhelper {
     required int b,
   }) async {
     var db = await getDB();
-    int row_affected = await db.insert(userlogintable_name, {
+    int rowAffected = await db.insert(userlogintable_name, {
       User_name: D,
       doctor_id_value: b,
     });
-    return row_affected > 0;
+    return rowAffected > 0;
   }
 
   Future<List<Map<String, dynamic>>> getData() async {
@@ -100,7 +100,7 @@ class DBhelper {
   Future<String> getname()async{
      var db = await getDB();
       List<Map<String, dynamic>> result = await db.rawQuery(
-        "SELECT ${User_name} FROM $userlogintable_name "
+        "SELECT $User_name FROM $userlogintable_name "
       );
       return result[0]["Username"];
   }

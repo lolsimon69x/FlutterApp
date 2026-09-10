@@ -11,7 +11,7 @@ class Home extends StatelessWidget {
       body: Row(
         children: [
           Center(
-            child: SizedBox(child: TextField(controller:textcontroller),width: 120.0,height: 60.0,)
+            child: SizedBox(width: 120.0,height: 60.0,child: TextField(controller:textcontroller),)
             ,
           ),ElevatedButton(onPressed: (){print(textcontroller.text);}, child: Text("add"))
         ],
