@@ -112,7 +112,7 @@ final _LanguagePack _manipuriPack = _LanguagePack(
 class WordSearchGamePage extends StatefulWidget {
   final int language_id;
 
-  const WordSearchGamePage({super.key, this.language_id = 0});
+  const WordSearchGamePage({super.key ,this.language_id= 0});
 
   @override
   State<WordSearchGamePage> createState() => _WordSearchGamePageState();

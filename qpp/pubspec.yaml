@@ -46,6 +46,7 @@ dependencies:
   drift_flutter: ^0.1.0
   sqlite3_flutter_libs: ^0.5.24
   connectivity_plus: ^6.0.0   # Detects network change.
+  
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -82,7 +83,9 @@ flutter:
     - assets/images/b.jpg
     - assets/images/c.jpg
     - assets/images/d.jpg
-    - assets/audio/dope_shope.mp3
+    
+    - assets/audio/ding.mp3
+    - assets/audio/ki_naam_di_matim.mp3
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

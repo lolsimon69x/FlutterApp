@@ -212,6 +212,31 @@ class SyncManager {
     }
   }
 
+  /// Triggers sync and returns the number of newly fetched remote reminders.
+  Future<int> triggerSyncAndDetectNew() async {
+    if (_authToken == null || _syncService == null) {
+      // Attempt login fallback if token is missing
+      final loggedIn = await _login();
+      if (!loggedIn || _authToken == null || _syncService == null) return 0;
+    }
+
+    if (_isSyncing) return 0;
+    _isSyncing = true;
+
+    int newRemindersCount = 0;
+    try {
+      await _syncService!.syncReminders(_authToken!);
+      await _syncService!.syncGameSessions(_authToken!);
+      newRemindersCount = await _syncService!.fetchRemoteReminders(_authToken!);
+    } catch (e) {
+      debugPrint('[SYNC ERROR] triggerSyncAndDetectNew failed: $e');
+    } finally {
+      _isSyncing = false;
+    }
+
+    return newRemindersCount;
+  }
+
   Future<void> dispose() async {
     _authRefreshTimer?.cancel();
     _heartbeatTimer?.cancel();

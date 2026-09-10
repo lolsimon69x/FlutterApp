@@ -22,7 +22,7 @@ ElevatedButton(
 // 2. The Main Game Page Widget
 // ==========================================
 class GamePageWidget extends StatelessWidget {
-  const GamePageWidget({Key? key}) : super(key: key);
+  const GamePageWidget({super.key});
 
   @override
   Widget build(BuildContext context) {

@@ -22,11 +22,11 @@ class CallDoctor extends StatelessWidget {
     return Scaffold(
       body: Center(
         child: SizedBox(
+          height: 150,
+        width: 300,
           child: ElevatedButton(onPressed: ()=> CallDoctorScreen(doctorNumber),
           
-                child: Text("call")),
-        height: 150,
-        width: 300,),
+                child: Text("call")),),
       ),
     );
   }
